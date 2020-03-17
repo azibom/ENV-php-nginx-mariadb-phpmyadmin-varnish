@@ -1,0 +1,68 @@
+version: "3.3"
+
+services:
+    env-nginx:
+        image: nginx:latest
+        container_name: env-nginx
+        ports:
+            - "8080:80"
+#           - "443:443"
+        volumes:
+            - ./website:/var/www/html/website:rw # With read / write access
+            - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro # With read-only access
+        networks:
+            - env-network
+        links:
+            - env-php
+    
+    env-mariadb:
+        image: mariadb:latest
+        container_name: env-mariadb
+        volumes:
+            - ./env-volume-mariadb:/var/lib/mysql
+        networks:
+            - env-network
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: 4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2
+    
+    env-php:
+        build: ./
+        container_name: env-php
+        volumes:
+            - ./website:/var/www/html/website
+        networks:
+            - env-network
+        links:
+            - env-mariadb
+
+    env-phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: env-phpmyadmin
+        networks:
+            - env-network
+        ports:
+            - "8183:80"
+        environment:
+            PMA_ARBITRARY: 1
+        links:
+            - env-mariadb
+
+    env-varnish:
+        image: varnish:latest
+        container_name: env-varnish
+        networks:
+            - env-network
+        ports:
+            - "80:80"
+        volumes:
+            - ./varnish/varnish.vcl:/etc/varnish/default.vcl:ro # With read-only access
+            - ./varnish/varnish:/etc/default/varnish:ro # With read-only access
+            - ./varnish/varnish.service:/lib/systemd/system/varnish.service:ro # With read-only access 
+        depends_on:
+            - env-nginx
+
+networks:
+    env-network:
+        driver: bridge
